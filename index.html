@@ -200,7 +200,7 @@
               <div class="money"><span class="symbol">$</span><input id="listingUSD" type="number" min="0" step="0.01" value="0.20" inputmode="decimal"></div>
             </div>
             <div class="field full">
-              <label for="vatRate">销售增值税 VAT<span class="sub">按商品定价 × 件数计算；默认 21%</span></label>
+              <label for="vatRate">销售增值税 VAT<span class="sub">从商品含税定价中拆分；默认 21%</span></label>
               <div class="money"><span class="symbol">%</span><input id="vatRate" type="number" min="0" step="0.1" value="21" inputmode="decimal"></div>
             </div>
             <div class="field full">
@@ -222,7 +222,7 @@
       <section class="result" aria-live="polite" aria-label="计算结果">
         <div class="result-top">
           <div>
-            <div class="result-kicker">建议商品定价 · 每件</div>
+            <div class="result-kicker">建议商品定价 · 每件 · 含 VAT</div>
             <div class="price" id="price">€0.00</div>
             <div class="price-rmb" id="priceRMB">≈ ¥0.00</div>
             <div class="price-caption" id="orderTotal">订单收款 €0.00（含买家运费）</div>
@@ -244,7 +244,7 @@
           <div class="row total"><span>每单经营利润</span><strong id="netProfit">€0.00</strong></div>
         </div>
         <div class="warning" id="warning" role="status"></div>
-        <div class="result-foot">销售 VAT = 商品定价 × 件数 × 税率，直接按定价扣除，不包含向买家收取的运费。建议定价已计入这笔税费；本计算不估算个人所得税。</div>
+        <div class="result-foot">商品定价为买家支付的含税价。销售 VAT = 含税商品定价 × 件数 × 税率 ÷（1 + 税率），例如含税 €121、税率 21% 时，VAT 为 €21。此处不包含向买家收取的运费；本计算不估算个人所得税。</div>
       </section>
     </div>
     <button class="reset" id="reset" type="button">恢复初始默认值</button>
@@ -306,7 +306,8 @@
         $('fixedFeesNote').textContent = `（固定支付费 $${v.paymentFixed.toFixed(2)}/单 + 刊登费 $${v.listingUSD.toFixed(2)} × ${v.quantity} 件）× 汇率 ${v.exchange}`;
         $('fxFeesNote').textContent = `订单收款（含买家运费）× ${v.fxRate}%`;
         const pct = (v.transactionRate + v.paymentRate + v.fxRate) / 100;
-        const retention = 1 - v.vatRate / 100 - pct;
+        const vatShare = v.vatRate / (100 + v.vatRate);
+        const retention = 1 - vatShare - pct;
         if (retention <= 0) {
           warning.textContent = '扣除 VAT 和平台、外汇费后没有可用收入，请调整费率。'; warning.classList.add('show');
           $('badge').textContent = '请调整费率';
@@ -327,7 +328,7 @@
         const platformFees = revenue * (v.transactionRate + v.paymentRate) / 100;
         const fxFees = revenue * v.fxRate / 100;
         const preTax = revenue - platformFees - fxFees - fixed - costs;
-        const tax = unitPrice * v.quantity * v.vatRate / 100;
+        const tax = unitPrice * v.quantity * vatShare;
         const net = preTax - tax;
         $('price').textContent = format(unitPrice);
         $('priceRMB').textContent = `≈ ${format(unitPrice * v.eurCny, 'CNY')} RMB`;
@@ -341,7 +342,7 @@
         result('revenue', revenue); result('percentFees', platformFees, true); result('fxFees', fxFees, true);
         result('fixedFees', fixed, true); result('productCost', productCost, true);
         result('extraTaxes', extraTaxes, true); result('courierTax', courierTax, true); result('otherCosts', otherCost, true);
-        $('vatLabel').textContent = `销售 VAT（定价的 ${v.vatRate}%）`;
+        $('vatLabel').textContent = `销售 VAT（从含税价拆分，税率 ${v.vatRate}%）`;
         result('preTax', preTax); result('salesVAT', tax, true); result('netProfit', net);
         $('badge').textContent = net + 1e-7 >= v.target ? '目标已达到' : '目标暂不可达';
         $('badge').classList.toggle('loss', net + 1e-7 < v.target);
