@@ -90,6 +90,13 @@
     .warning { display: none; background: #fff1e8; color: #8e4f31; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 12px; }
     .warning.show { display: block; }
     footer { text-align: center; color: #858b83; font-size: 10px; line-height: 1.6; padding: 17px 12px 0; }
+    .sales-plan { margin-top: 16px; }
+    .plan-results { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .plan-metric { min-width: 0; background: var(--green-soft); border-radius: 12px; padding: 14px 12px; }
+    .plan-metric span { display: block; color: #555d55; font-size: 12px; }
+    .plan-metric strong { display: block; color: var(--green); font-size: 25px; margin-top: 6px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+    .plan-metric small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
+    .plan-profit { color: var(--green); font-size: 13px; line-height: 1.6; margin: 14px 0 0; }
     .reset { display: block; border: 0; background: transparent; color: #708073; text-decoration: underline; text-underline-offset: 3px; font: inherit; font-size: 11px; margin: 12px auto 0; cursor: pointer; }
     @media (min-width: 620px) {
       .shell { padding: 42px 24px 64px; }
@@ -145,7 +152,7 @@
               <div class="fields fees">
                 <div class="field">
                   <label for="shipping">每单物流和包装成本</label>
-                  <div class="money"><span class="symbol">€</span><input id="shipping" type="number" min="0" step="0.01" value="3" inputmode="decimal"></div>
+                  <div class="money"><span class="symbol">€</span><input id="shipping" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
                 </div>
                 <div class="field">
                   <label for="buyerShipping">向买家收取的运费</label>
@@ -247,19 +254,41 @@
         <div class="result-foot">商品定价为买家支付的含税价。销售 VAT = 含税商品定价 × 件数 × 税率 ÷（1 + 税率），例如含税 €121、税率 21% 时，VAT 为 €21。此处不包含向买家收取的运费；本计算不估算个人所得税。</div>
       </section>
     </div>
+    <section class="card sales-plan" aria-labelledby="planTitle">
+      <h2 class="section-title" id="planTitle"><span class="step">3</span>预期利润和销量</h2>
+      <div class="fields">
+        <div class="field">
+          <label for="monthlyProfit">预期每月利润<span class="sub">欧元，扣 VAT 和经营成本后，所得税前</span></label>
+          <div class="money"><span class="symbol">€</span><input id="monthlyProfit" type="number" min="0" step="0.01" value="1000" inputmode="decimal"></div>
+          <span class="conversion" id="monthlyProfitConversion"></span>
+        </div>
+        <div class="field">
+          <label for="sellingDays">每月销售天数<span class="sub">用于分配每天销量，默认 30 天</span></label>
+          <input id="sellingDays" type="number" min="1" max="31" step="1" value="30" inputmode="numeric">
+        </div>
+      </div>
+      <div aria-live="polite">
+        <div class="plan-results">
+          <div class="plan-metric"><span>每月需卖</span><strong id="monthlyUnits">—</strong><small id="monthlyOrders">—</small></div>
+          <div class="plan-metric"><span>每天需要卖</span><strong id="dailyUnits">—</strong><small id="dailyOrders">—</small></div>
+        </div>
+        <p class="plan-profit" id="plannedProfit">—</p>
+        <p class="note" id="planNote">按上方每单经营利润计算。</p>
+      </div>
+    </section>
     <button class="reset" id="reset" type="button">恢复初始默认值</button>
     <footer>费率和税务处理可能因账户、商品及目的地而不同，请以实际平台账单和适用规则为准。页面数据仅保存在此设备的浏览器中。</footer>
   </main>
   <script>
     (() => {
       const defaults = {
-        cost: 8, quantity: 1, target: 10, market: 'spain', platform: 'etsy', costCurrency: 'EUR', shipping: 3,
+        cost: 8, quantity: 1, target: 10, market: 'spain', platform: 'etsy', costCurrency: 'EUR', shipping: 0,
         buyerShipping: 0, customs: 3, clearance: 2, customsQuantity: 1, clearanceOrders: 1, other: 0, transactionRate: 6.5,
         paymentRate: 4, paymentFixed: 0.30, listingUSD: 0.20, exchange: 0.90,
-        courierTaxEUR: 12.82, fxRate: 2.5, eurCny: 7.8, vatRate: 21
+        courierTaxEUR: 12.82, fxRate: 2.5, eurCny: 7.8, vatRate: 21, monthlyProfit: 1000, sellingDays: 30
       };
       const ids = Object.keys(defaults);
-      const numericIds = ids.filter(id => typeof defaults[id] === 'number');
+      const numericIds = ids.filter(id => typeof defaults[id] === 'number' && !['monthlyProfit', 'sellingDays'].includes(id));
       const $ = id => document.getElementById(id);
       const format = (v, currency = 'EUR') => new Intl.NumberFormat('zh-CN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
       let saved = {};
@@ -284,6 +313,36 @@
       function read() {
         return Object.fromEntries(ids.map(id => [id, typeof defaults[id] === 'number' ? ($(id).value.trim() === '' ? NaN : Number($(id).value)) : $(id).value]));
       }
+      function clearPlan(message) {
+        ['monthlyUnits', 'monthlyOrders', 'dailyUnits', 'dailyOrders', 'plannedProfit'].forEach(id => { $(id).textContent = '—'; });
+        $('monthlyProfitConversion').textContent = '';
+        $('planNote').textContent = message;
+      }
+      function updatePlan(v, net) {
+        if (!Number.isFinite(v.monthlyProfit) || v.monthlyProfit < 0) {
+          clearPlan('请填写预期每月利润，金额需大于或等于 0。');
+          return;
+        }
+        if (!Number.isInteger(v.sellingDays) || v.sellingDays < 1 || v.sellingDays > 31) {
+          clearPlan('每月销售天数需为 1 至 31 的整数。');
+          return;
+        }
+        if (net <= 0 && v.monthlyProfit > 0) {
+          clearPlan('当前每单经营利润不大于 0，无法通过增加销量达到预期利润，请先调整上方参数。');
+          return;
+        }
+        const orders = v.monthlyProfit === 0 ? 0 : Math.ceil(v.monthlyProfit / net - 1e-9);
+        const dailyOrders = orders / v.sellingDays;
+        const dailyUnits = orders * v.quantity / v.sellingDays;
+        const count = value => value.toLocaleString('zh-CN');
+        $('monthlyProfitConversion').textContent = `≈ ${format(v.monthlyProfit * v.eurCny, 'CNY')} RMB`;
+        $('monthlyUnits').textContent = `${count(orders * v.quantity)} 件`;
+        $('monthlyOrders').textContent = `${count(orders)} 单 / 月`;
+        $('dailyUnits').textContent = `${dailyUnits.toFixed(2)} 件`;
+        $('dailyOrders').textContent = `${dailyOrders.toFixed(2)} 单 / 销售日（日均）`;
+        $('plannedProfit').textContent = `完成每月所需销量后，预计利润 ${format(orders * net)} / ${format(orders * net * v.eurCny, 'CNY')} RMB`;
+        $('planNote').textContent = `按每单经营利润 ${format(net)}、每单 ${v.quantity} 件计算，每月销量按整单向上取整；每天需要卖的件数和单数为月销量 ÷ ${v.sellingDays} 个销售日，按四舍五入保留两位小数显示。`;
+      }
       function update() {
         const v = read();
         const warning = $('warning');
@@ -293,6 +352,7 @@
         if (invalid) {
           warning.textContent = ['quantity', 'customsQuantity', 'clearanceOrders'].includes(invalid) ? '商品件数、计费件数和计费单数需为大于 0 的整数。' : ['exchange','eurCny'].includes(invalid) ? '汇率需为大于 0 的数值。' : '请填写完整，金额和费率不能小于 0。';
           warning.classList.add('show'); $('badge').textContent = '请检查输入';
+          clearPlan('请先检查上方成本、费率和商品件数，填写有效数据后计算销量。');
           ['price','priceRMB','orderTotal','revenue','percentFees','fxFees','fixedFees','productCost','extraTaxes','courierTax','otherCosts','preTax','salesVAT','netProfit'].forEach(id => { $(id).textContent = '—'; });
           return;
         }
@@ -311,6 +371,7 @@
         if (retention <= 0) {
           warning.textContent = '扣除 VAT 和平台、外汇费后没有可用收入，请调整费率。'; warning.classList.add('show');
           $('badge').textContent = '请调整费率';
+          clearPlan('请先调整上方费率，得到有效的每单利润后计算销量。');
           ['price','priceRMB','orderTotal','revenue','percentFees','fxFees','fixedFees','productCost','extraTaxes','courierTax','otherCosts','preTax','salesVAT','netProfit'].forEach(id => { $(id).textContent = '—'; });
           return;
         }
@@ -346,6 +407,7 @@
         result('preTax', preTax); result('salesVAT', tax, true); result('netProfit', net);
         $('badge').textContent = net + 1e-7 >= v.target ? '目标已达到' : '目标暂不可达';
         $('badge').classList.toggle('loss', net + 1e-7 < v.target);
+        updatePlan(v, net);
       }
       ids.forEach(id => $(id).addEventListener('input', update));
       document.querySelectorAll('[data-target]').forEach(button => button.addEventListener('click', () => { $('target').value = button.dataset.target; update(); }));
