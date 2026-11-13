@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f4f0">
+  <title>售价计算器 · 小店账本</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f4f0;
+      --card: #fff;
+      --ink: #20251f;
+      --muted: #777d75;
+      --line: #e8e9e3;
+      --green: #365c47;
+      --green-soft: #eaf1eb;
+      --orange: #d88754;
+      --shadow: 0 12px 32px rgba(38, 48, 39, .055);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .shell { width: min(100%, 760px); margin: 0 auto; padding: 26px 16px 48px; }
+    header { padding: 8px 4px 22px; }
+    .eyebrow { color: var(--green); text-transform: uppercase; letter-spacing: .13em; font-size: 11px; font-weight: 750; }
+    h1 { font-size: clamp(27px, 7vw, 38px); line-height: 1.12; letter-spacing: -.045em; margin: 9px 0 9px; }
+    header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .layout { display: grid; gap: 14px; }
+    .card { background: var(--card); border: 1px solid rgba(37, 54, 41, .06); border-radius: 20px; padding: 19px; box-shadow: var(--shadow); }
+    .section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; font-size: 16px; letter-spacing: -.02em; }
+    .step { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 9px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 800; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 13px 12px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    label { display: block; color: #555d55; font-size: 12px; font-weight: 650; line-height: 1.5; margin: 0 0 7px; }
+    .sub { display: block; font-weight: 450; color: #969b94; font-size: 11px; line-height: 1.5; margin-top: 3px; }
+    input, select {
+      width: 100%; height: 47px; min-height: 47px; border: 1px solid #e1e5df; border-radius: 12px; background: #fff;
+      color: var(--ink); padding: 0 12px; font: inherit; font-size: 16px; outline: none;
+      -webkit-appearance: none; appearance: none;
+      transition: border .15s, box-shadow .15s;
+    }
+    select {
+      padding-right: 32px;
+      background-image: linear-gradient(45deg, transparent 50%, #777d75 50%), linear-gradient(135deg, #777d75 50%, transparent 50%);
+      background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px;
+      background-size: 5px 5px;
+      background-repeat: no-repeat;
+    }
+    input:focus, select:focus { border-color: #6d9278; box-shadow: 0 0 0 3px rgba(68, 117, 82, .12); }
+    input[type="number"] { font-variant-numeric: tabular-nums; }
+    .money { position: relative; }
+    .money input { padding-left: 31px; }
+    .money .symbol { position: absolute; z-index: 1; top: 50%; transform: translateY(-50%); left: 12px; color: #8b9289; font-size: 14px; }
+    .quick-targets { display: flex; gap: 8px; margin-top: 9px; }
+    .chip { border: 1px solid #e3e8e1; background: #fff; color: #59635a; border-radius: 999px; min-height: 32px; padding: 0 12px; font: inherit; font-size: 12px; cursor: pointer; }
+    .chip.active { background: var(--green-soft); border-color: #d4e3d6; color: var(--green); font-weight: 700; }
+    .advanced { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+    details summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; color: #465348; font-size: 13px; font-weight: 700; padding: 1px 0; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::after { content: "+"; color: #809184; font-size: 20px; font-weight: 400; }
+    details[open] summary::after { content: "−"; }
+    .fees { padding-top: 15px; }
+    .note { background: #f7f8f5; border-radius: 11px; padding: 10px 11px; color: #727a70; font-size: 11px; line-height: 1.55; margin: 12px 0 0; }
+    .result { background: #263d31; color: #fff; border-radius: 22px; padding: 21px; box-shadow: 0 16px 34px rgba(37, 62, 46, .18); }
+    .result-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+    .result-kicker { font-size: 12px; color: #c7d7ca; font-weight: 600; }
+    .price { font-variant-numeric: tabular-nums; font-size: clamp(40px, 12vw, 56px); line-height: 1; letter-spacing: -.055em; margin: 10px 0 5px; font-weight: 760; }
+    .price-caption { color: #d5e0d5; font-size: 12px; }
+    .price-rmb { font-size: 22px; color: #d5e0d5; margin: 8px 0 12px; font-variant-numeric: tabular-nums; }
+    .conversion { display: block; color: #7e877b; font-size: 11px; margin-top: 6px; min-height: 16px; }
+    .row strong small { display: block; color: #b9cabd; font-size: 11px; font-weight: 450; margin-top: 3px; }
+    .row > span { flex: 1; }
+    .fee-note { display: block; color: #b9cabd; font-size: 10px; font-weight: 450; line-height: 1.55; margin-top: 4px; }
+    .result-badge { white-space: nowrap; border: 1px solid rgba(220, 238, 222, .24); border-radius: 999px; padding: 7px 10px; color: #dce9dd; font-size: 11px; }
+    .result-badge.loss { color: #ffd6c1; border-color: rgba(255, 214, 193, .4); }
+    .divider { height: 1px; background: rgba(255,255,255,.14); margin: 18px 0 13px; }
+    .rows { display: grid; gap: 11px; }
+    .row { display: flex; justify-content: space-between; gap: 14px; color: #d2ddd3; font-size: 13px; }
+    .row strong { color: #fff; font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+    .row.total { padding-top: 12px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,.15); color: #fff; font-weight: 700; }
+    .row.total strong { font-size: 17px; }
+    .result-foot { margin-top: 14px; color: #b9cabd; font-size: 10px; line-height: 1.55; }
+    .warning { display: none; background: #fff1e8; color: #8e4f31; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-top: 12px; }
+    .warning.show { display: block; }
+    footer { text-align: center; color: #858b83; font-size: 10px; line-height: 1.6; padding: 17px 12px 0; }
+    .sales-plan { margin-top: 16px; }
+    .plan-results { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .plan-metric { min-width: 0; background: var(--green-soft); border-radius: 12px; padding: 14px 12px; }
+    .plan-metric span { display: block; color: #555d55; font-size: 12px; }
+    .plan-metric strong { display: block; color: var(--green); font-size: 25px; margin-top: 6px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+    .plan-metric small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
+    .plan-profit { color: var(--green); font-size: 13px; line-height: 1.6; margin: 14px 0 0; }
+    .reset { display: block; border: 0; background: transparent; color: #708073; text-decoration: underline; text-underline-offset: 3px; font: inherit; font-size: 11px; margin: 12px auto 0; cursor: pointer; }
+    @media (min-width: 620px) {
+      .shell { padding: 42px 24px 64px; }
+      .layout { grid-template-columns: 1fr 1fr; align-items: start; gap: 16px; }
+      .result { position: sticky; top: 20px; }
+      header { padding-bottom: 26px; }
+      .card { padding: 22px; }
+    }
+    @media (max-width: 365px) { .card, .result { padding: 16px; border-radius: 17px; } .fields { gap: 11px 8px; } input, select { padding-left: 9px; padding-right: 8px; } select { padding-right: 32px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="eyebrow">小店账本 · 01</div>
+      <h1>这件商品，<br>卖多少才划算？</h1>
+      <p>填入成本和目标利润，马上算出建议售价。金额同时换算欧元和人民币。</p>
+    </header>
+    <div class="layout">
+      <div class="inputs-column">
+        <section class="card">
+          <h2 class="section-title"><span class="step">1</span>商品和目标</h2>
+          <div class="fields">
+            <div class="field full">
+              <label for="costCurrency">商品、物流和其他成本的输入币种</label>
+              <select id="costCurrency"><option value="EUR">欧元 EUR</option><option value="CNY">人民币 RMB</option></select>
+            </div>
+            <div class="field">
+              <label for="cost">单件商品成本<span class="sub">进货或制作成本</span></label>
+              <div class="money"><span class="symbol">€</span><input id="cost" type="number" min="0" step="0.01" value="8" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+              <label for="quantity">每单商品件数</label>
+              <input id="quantity" type="number" min="1" step="1" value="1" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="target">目标每单利润<span class="sub">扣 VAT 和经营成本后，所得税前</span></label>
+              <div class="money"><span class="symbol">€</span><input id="target" type="number" min="0" step="0.01" value="10" inputmode="decimal"></div>
+              <div class="quick-targets"><button class="chip active" type="button" data-target="10">€10</button><button class="chip" type="button" data-target="15">€15</button></div>
+            </div>
+            <div class="field">
+              <label for="market">销售市场</label>
+              <select id="market"><option value="spain">西班牙</option><option value="eu">其他欧盟国家</option><option value="us">美国</option></select>
+            </div>
+            <div class="field full">
+              <label for="platform">销售平台</label>
+              <select id="platform"><option value="etsy">Etsy（西班牙账户）</option><option value="aliexpress">速卖通 AliExpress（西班牙卖家，费率待核实）</option><option value="custom">通用 / 自定义渠道</option></select>
+            </div>
+          </div>
+          <div class="advanced">
+            <details open>
+              <summary>运输、额外税费和其他成本</summary>
+              <div class="fields fees">
+                <div class="field">
+                  <label for="shipping">每单物流和包装成本</label>
+                  <div class="money"><span class="symbol">€</span><input id="shipping" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+                </div>
+                <div class="field">
+                  <label for="buyerShipping">向买家收取的运费</label>
+                  <div class="money"><span class="symbol">€</span><input id="buyerShipping" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+                </div>
+                <div class="field">
+                  <label for="customs">额外税费 ①<span class="sub">欧元 / 每件，默认 €3</span></label>
+                  <div class="money"><span class="symbol">€</span><input id="customs" type="number" min="0" step="0.01" value="3" inputmode="decimal"></div>
+                </div>
+                <div class="field">
+                  <label for="clearance">额外税费 ②<span class="sub">欧元 / 每单，默认 €2</span></label>
+                  <div class="money"><span class="symbol">€</span><input id="clearance" type="number" min="0" step="0.01" value="2" inputmode="decimal"></div>
+                </div>
+                <div class="field">
+                  <label for="customsQuantity">税费 ① 计费件数<span class="sub">税费 ① × 件数，默认 1</span></label>
+                  <input id="customsQuantity" type="number" min="1" step="1" value="1" inputmode="numeric">
+                </div>
+                <div class="field">
+                  <label for="clearanceOrders">税费 ② 计费单数<span class="sub">税费 ② × 单数，默认 1</span></label>
+                  <input id="clearanceOrders" type="number" min="1" step="1" value="1" inputmode="numeric">
+                </div>
+                <div class="field full">
+                  <label for="courierTaxEUR">快递税<span class="sub">欧元 / 每单，初始金额由 ¥100 折算</span></label>
+                  <div class="money"><span class="symbol">€</span><input id="courierTaxEUR" type="number" min="0" step="0.01" value="12.82" inputmode="decimal"></div>
+                </div>
+                <div class="field full">
+                  <label for="other">广告、退货或其他风险成本<span class="sub">每单金额，没有可填 0</span></label>
+                  <div class="money"><span class="symbol">€</span><input id="other" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+                </div>
+              </div>
+              <p class="note" id="customsNote">额外税费 = 税费 ①（默认 €3/件）× 计费件数 + 税费 ②（默认 €2/单）× 计费单数，件数和单数默认均为 1，独立于上方每单商品件数；不适用的税费金额可改为 0。清关通常已包含在快递报价里；物流成本和快递税请按实际账单填写，避免重复计入。</p>
+            </details>
+          </div>
+        </section>
+        <section class="card" style="margin-top:14px">
+          <h2 class="section-title"><span class="step">2</span>费率和汇率</h2>
+          <div class="fields">
+            <div class="field">
+              <label for="transactionRate">成交交易费（Etsy / 速卖通）<span class="sub">按订单金额比例</span></label>
+              <div class="money"><span class="symbol">%</span><input id="transactionRate" type="number" min="0" step="0.1" value="6.5" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+              <label for="paymentRate">支付通道费（Etsy / 速卖通，按实际账单）<span class="sub">按订单金额比例</span></label>
+              <div class="money"><span class="symbol">%</span><input id="paymentRate" type="number" min="0" step="0.1" value="4" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+              <label for="paymentFixed">支付通道固定费（Etsy；速卖通按实际）<span class="sub">欧元 / 每笔订单，默认 €0.30</span></label>
+              <div class="money"><span class="symbol">€</span><input id="paymentFixed" type="number" min="0" step="0.01" value="0.30" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+              <label for="listingUSD">刊登费（Etsy）<span class="sub">美元 / 每件</span></label>
+              <div class="money"><span class="symbol">$</span><input id="listingUSD" type="number" min="0" step="0.01" value="0.20" inputmode="decimal"></div>
+            </div>
+            <div class="field full">
+              <label for="regulatoryRate">西班牙监管运营费（Etsy专属）<span class="sub">默认0.88%；仅选择Etsy时计入，按不含VAT的商品销售额及买家运费估算</span></label>
+                <div class="money"><span class="symbol">%</span><input id="regulatoryRate" type="number" min="0" step="0.01" value="0.88" inputmode="decimal"></div>
+              </div>
+              <div class="field full">
+                <label for="vatRate">销售增值税 VAT<span class="sub">从商品含税定价中拆分；默认 21%</span></label>
+              <div class="money"><span class="symbol">%</span><input id="vatRate" type="number" min="0" step="0.1" value="21" inputmode="decimal"></div>
+            </div>
+            <div class="field full">
+              <label for="fxRate">外汇费（Etsy / 速卖通，按实际）<span class="sub">按订单收款金额计算，默认 2.5%</span></label>
+              <div class="money"><span class="symbol">%</span><input id="fxRate" type="number" min="0" step="0.1" value="2.5" inputmode="decimal"></div>
+            </div>
+            <div class="field full">
+              <label for="eurCny">欧元兑人民币汇率<span class="sub">1 欧元 = 多少人民币；默认示例值，请按实际修改</span></label>
+              <div class="money"><span class="symbol">¥</span><input id="eurCny" type="number" min="0.0001" step="0.0001" value="7.8" inputmode="decimal"></div>
+            </div>
+            <div class="field full">
+              <label for="exchange">换算汇率<span class="sub">1 美元 = 多少欧元</span></label>
+              <div class="money"><span class="symbol">€</span><input id="exchange" type="number" min="0.0001" step="0.0001" value="0.90" inputmode="decimal"></div>
+            </div>
+          </div>
+          <p class="note">按当前设置：6.5% 交易费 + 4% 支付处理费 + €0.30/单固定支付费 + $0.20/件刊登费 + 西班牙监管运营费0.88%（Etsy）。汇率可按实际账单修改。速卖通模式暂按8%成交佣金、支付费和刊登费先设0（未核实，不代表免费）；Etsy专属费用在速卖通模式下不计入。所有费用项始终显示，平台切换时自动应用该平台上次填写的费率。广告、进口税费按上方现有成本预留，不重复增加。</p>
+        </section>
+      </div>
+      <section class="result" aria-live="polite" aria-label="计算结果">
+        <div class="result-top">
+          <div>
+            <div class="result-kicker">建议商品定价 · 每件 · 含 VAT</div>
+            <div class="price" id="price">€0.00</div>
+            <div class="price-rmb" id="priceRMB">≈ ¥0.00</div>
+            <div class="price-caption" id="orderTotal">订单收款 €0.00（含买家运费）</div>
+          </div>
+          <div class="result-badge" id="badge">目标已达到</div>
+        </div>
+        <div class="divider"></div>
+        <div class="rows">
+          <div class="row"><span>订单总收入</span><strong id="revenue">€0.00</strong></div>
+          <div class="row"><span>平台比例费用<small class="fee-note" id="percentFeesNote"></small></span><strong id="percentFees">−€0.00</strong></div>
+          <div class="row"><span>西班牙监管运营费（Etsy）<small class="fee-note" id="regulatoryFeesNote"></small></span><strong id="regulatoryFees">−€0.00</strong></div>
+          <div class="row"><span>外汇费<small class="fee-note" id="fxFeesNote"></small></span><strong id="fxFees">−€0.00</strong></div>
+          <div class="row"><span>固定平台费用<small class="fee-note" id="fixedFeesNote"></small></span><strong id="fixedFees">−€0.00</strong></div>
+          <div class="row"><span>商品成本</span><strong id="productCost">−€0.00</strong></div>
+          <div class="row"><span>额外税费（① 按件 + ② 按单）</span><strong id="extraTaxes">−€0.00</strong></div>
+          <div class="row"><span>快递税（按单）</span><strong id="courierTax">−€0.00</strong></div>
+          <div class="row"><span>物流、包装及其他<small class="fee-note">物流包装成本 + 广告、退货或其他风险成本</small></span><strong id="otherCosts">−€0.00</strong></div>
+          <div class="row"><span>扣 VAT 前结余</span><strong id="preTax">€0.00</strong></div>
+          <div class="row"><span id="vatLabel">销售 VAT（21%）</span><strong id="salesVAT">−€0.00</strong></div>
+          <div class="row total"><span>每单经营利润</span><strong id="netProfit">€0.00</strong></div>
+        </div>
+        <div class="warning" id="warning" role="status"></div>
+        <div class="result-foot">商品定价为买家支付的含税价。销售 VAT = 含税商品定价 × 件数 × 税率 ÷（1 + 税率），例如含税 €121、税率 21% 时，VAT 为 €21。此处不包含向买家收取的运费；本计算不估算个人所得税。</div>
+      </section>
+    </div>
+    <section class="card sales-plan" aria-labelledby="planTitle">
+      <h2 class="section-title" id="planTitle"><span class="step">3</span>预期利润和销量</h2>
+      <div class="fields">
+        <div class="field">
+          <label for="monthlyProfit">预期每月利润<span class="sub">欧元，扣 VAT 和经营成本后，所得税前</span></label>
+          <div class="money"><span class="symbol">€</span><input id="monthlyProfit" type="number" min="0" step="0.01" value="1000" inputmode="decimal"></div>
+          <span class="conversion" id="monthlyProfitConversion"></span>
+        </div>
+        <div class="field">
+          <label for="sellingDays">每月销售天数<span class="sub">用于分配每天销量，默认 30 天</span></label>
+          <input id="sellingDays" type="number" min="1" max="31" step="1" value="30" inputmode="numeric">
+        </div>
+      </div>
+      <div aria-live="polite">
+        <div class="plan-results">
+          <div class="plan-metric"><span>每月需卖</span><strong id="monthlyUnits">—</strong><small id="monthlyOrders">—</small></div>
+          <div class="plan-metric"><span>每天需要卖</span><strong id="dailyUnits">—</strong><small id="dailyOrders">—</small></div>
+        </div>
+        <p class="plan-profit" id="plannedProfit">—</p>
+        <p class="note" id="planNote">按上方每单经营利润计算。</p>
+      </div>
+    </section>
+    <button class="reset" id="reset" type="button">恢复初始默认值</button>
+    <footer>费率和税务处理可能因账户、商品及目的地而不同，请以实际平台账单和适用规则为准。页面数据仅保存在此设备的浏览器中。</footer>
+  </main>
+  <script>
+    (() => {
+      const defaults = {
+        cost: 8, quantity: 1, target: 10, market: 'spain', platform: 'etsy', costCurrency: 'EUR', shipping: 0,
+        buyerShipping: 0, customs: 3, clearance: 2, customsQuantity: 1, clearanceOrders: 1, other: 0, transactionRate: 6.5,
+        paymentRate: 4, paymentFixed: 0.30, listingUSD: 0.20, regulatoryRate: 0.88, exchange: 0.90,
+        courierTaxEUR: 12.82, fxRate: 2.5, eurCny: 7.8, vatRate: 21, monthlyProfit: 1000, sellingDays: 30
+      };
+      const ids = Object.keys(defaults);
+      const numericIds = ids.filter(id => typeof defaults[id] === 'number' && !['monthlyProfit', 'sellingDays'].includes(id));
+      const $ = id => document.getElementById(id);
+      const format = (v, currency = 'EUR') => new Intl.NumberFormat('zh-CN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem('shop-price-calculator-v2') || localStorage.getItem('shop-price-calculator-v1') || '{}') || {};
+        if (saved.market === 'us' && saved.eurCny == null) { saved.customs = 0; saved.clearance = 0; }
+      } catch { /* use defaults if storage is unavailable */ }
+      if (saved.market === 'us' && saved.vatRate == null) saved.vatRate = 0;
+      // Migrate the previously entered RMB courier tax into the euro input.
+      if (saved.courierTaxCNY != null) {
+        const rate = Number(saved.eurCny) > 0 ? Number(saved.eurCny) : defaults.eurCny;
+        saved.courierTaxEUR = Math.round(Number(saved.courierTaxCNY) / rate * 100) / 100;
+      }
+      ids.forEach(id => { $(id).value = saved[id] ?? defaults[id]; });
+      const costIds = ['cost', 'shipping', 'other'];
+      const amountCurrencies = {cost: 'cost', shipping: 'cost', other: 'cost', target: 'EUR', buyerShipping: 'EUR', customs: 'EUR', clearance: 'EUR', paymentFixed: 'EUR', listingUSD: 'USD', courierTaxEUR: 'EUR'};
+      Object.keys(amountCurrencies).forEach(id => {
+        const helper = document.createElement('span');
+        helper.className = 'conversion'; helper.id = id + 'Conversion';
+        $(id).parentElement.after(helper);
+      });
+      function read() {
+        return Object.fromEntries(ids.map(id => [id, typeof defaults[id] === 'number' ? ($(id).value.trim() === '' ? NaN : Number($(id).value)) : $(id).value]));
+      }
+      function clearPlan(message) {
+        ['monthlyUnits', 'monthlyOrders', 'dailyUnits', 'dailyOrders', 'plannedProfit'].forEach(id => { $(id).textContent = '—'; });
+        $('monthlyProfitConversion').textContent = '';
+        $('planNote').textContent = message;
+      }
+      function updatePlan(v, net) {
+        if (!Number.isFinite(v.monthlyProfit) || v.monthlyProfit < 0) {
+          clearPlan('请填写预期每月利润，金额需大于或等于 0。');
+          return;
+        }
+        if (!Number.isInteger(v.sellingDays) || v.sellingDays < 1 || v.sellingDays > 31) {
+          clearPlan('每月销售天数需为 1 至 31 的整数。');
+          return;
+        }
+        if (net <= 0 && v.monthlyProfit > 0) {
+          clearPlan('当前每单经营利润不大于 0，无法通过增加销量达到预期利润，请先调整上方参数。');
+          return;
+        }
+        const orders = v.monthlyProfit === 0 ? 0 : Math.ceil(v.monthlyProfit / net - 1e-9);
+        const dailyOrders = orders / v.sellingDays;
+        const dailyUnits = orders * v.quantity / v.sellingDays;
+        const count = value => value.toLocaleString('zh-CN');
+        $('monthlyProfitConversion').textContent = `≈ ${format(v.monthlyProfit * v.eurCny, 'CNY')} RMB`;
+        $('monthlyUnits').textContent = `${count(orders * v.quantity)} 件`;
+        $('monthlyOrders').textContent = `${count(orders)} 单 / 月`;
+        $('dailyUnits').textContent = `${dailyUnits.toFixed(2)} 件`;
+        $('dailyOrders').textContent = `${dailyOrders.toFixed(2)} 单 / 销售日（日均）`;
+        $('plannedProfit').textContent = `完成每月所需销量后，预计利润 ${format(orders * net)} / ${format(orders * net * v.eurCny, 'CNY')} RMB`;
+        $('planNote').textContent = `按每单经营利润 ${format(net)}、每单 ${v.quantity} 件计算，每月销量按整单向上取整；每天需要卖的件数和单数为月销量 ÷ ${v.sellingDays} 个销售日，按四舍五入保留两位小数显示。`;
+      }
+      function update() {
+        const v = read();
+        const warning = $('warning');
+        const invalid = numericIds.find(id => !Number.isFinite(v[id]) || v[id] < 0 || (['quantity', 'customsQuantity', 'clearanceOrders'].includes(id) && (!Number.isInteger(v[id]) || v[id] < 1)) || (['exchange', 'eurCny'].includes(id) && v[id] <= 0));
+        document.querySelectorAll('[data-target]').forEach(chip => chip.classList.toggle('active', Number(chip.dataset.target) === v.target));
+        costIds.forEach(id => { $(id).parentElement.querySelector('.symbol').textContent = v.costCurrency === 'CNY' ? '¥' : '€'; });
+        if (invalid) {
+          warning.textContent = ['quantity', 'customsQuantity', 'clearanceOrders'].includes(invalid) ? '商品件数、计费件数和计费单数需为大于 0 的整数。' : ['exchange','eurCny'].includes(invalid) ? '汇率需为大于 0 的数值。' : '请填写完整，金额和费率不能小于 0。';
+          warning.classList.add('show'); $('badge').textContent = '请检查输入';
+          clearPlan('请先检查上方成本、费率和商品件数，填写有效数据后计算销量。');
+          ['price','priceRMB','orderTotal','revenue','percentFees','regulatoryFees','fxFees','fixedFees','productCost','extraTaxes','courierTax','otherCosts','preTax','salesVAT','netProfit'].forEach(id => { $(id).textContent = '—'; });
+          return;
+        }
+        warning.classList.remove('show');
+        const asEuro = (amount, currency) => currency === 'CNY' ? amount / v.eurCny : currency === 'USD' ? amount * v.exchange : amount;
+        Object.entries(amountCurrencies).forEach(([id, currency]) => {
+          const eur = asEuro(v[id], currency === 'cost' ? v.costCurrency : currency);
+          $(id + 'Conversion').textContent = `${format(eur)} / ${format(eur * v.eurCny, 'CNY')} RMB`;
+        });
+        $('percentFeesNote').textContent = `订单收款 ×（交易费 ${v.transactionRate}% + 支付通道费 ${v.paymentRate}%）`;
+        $('fixedFeesNote').textContent = `固定支付费 €${v.paymentFixed.toFixed(2)}/单 + 刊登费 $${v.listingUSD.toFixed(2)} × ${v.quantity} 件 × 美元兑欧元汇率 ${v.exchange}`;
+        const regulatoryRate = v.platform === 'etsy' ? v.regulatoryRate / 100 : 0;
+        $('regulatoryFeesNote').textContent = v.platform === 'etsy' ? `不含VAT的商品销售额及买家运费 × ${v.regulatoryRate}%（估算）` : '非Etsy渠道，不计入';
+        $('fxFeesNote').textContent = `订单收款（含买家运费）× ${v.fxRate}%`;
+        const pct = (v.transactionRate + v.paymentRate + v.fxRate) / 100;
+        const vatShare = v.vatRate / (100 + v.vatRate);
+        const retention = 1 - vatShare - pct - regulatoryRate * (1 - vatShare);
+        if (retention <= 0) {
+          warning.textContent = '扣除 VAT 和平台、外汇费后没有可用收入，请调整费率。'; warning.classList.add('show');
+          $('badge').textContent = '请调整费率';
+          clearPlan('请先调整上方费率，得到有效的每单利润后计算销量。');
+          ['price','priceRMB','orderTotal','revenue','percentFees','regulatoryFees','fxFees','fixedFees','productCost','extraTaxes','courierTax','otherCosts','preTax','salesVAT','netProfit'].forEach(id => { $(id).textContent = '—'; });
+          return;
+        }
+        try { localStorage.setItem('shop-price-calculator-v2', JSON.stringify(v)); } catch { /* storage may be blocked */ }
+        const productCost = asEuro(v.cost, v.costCurrency) * v.quantity;
+        const otherCost = asEuro(v.shipping + v.other, v.costCurrency);
+        const extraTaxes = v.customs * v.customsQuantity + v.clearance * v.clearanceOrders;
+        const courierTax = v.courierTaxEUR;
+        const fixed = v.paymentFixed + v.listingUSD * v.quantity * v.exchange;
+        const costs = productCost + otherCost + extraTaxes + courierTax;
+        const requiredProductRevenue = (v.target + costs + fixed - v.buyerShipping * (1 - pct - regulatoryRate)) / retention;
+        // Round each item up to a cent so the displayed selling price reaches the target.
+        const unitPrice = Math.ceil(Math.max(0, requiredProductRevenue / v.quantity) * 100 - 1e-9) / 100;
+        const revenue = unitPrice * v.quantity + v.buyerShipping;
+        const platformFees = revenue * (v.transactionRate + v.paymentRate) / 100;
+        const fxFees = revenue * v.fxRate / 100;
+        const regulatoryFees = regulatoryRate * (unitPrice * v.quantity * (1 - vatShare) + v.buyerShipping);
+        const preTax = revenue - platformFees - regulatoryFees - fxFees - fixed - costs;
+        const tax = unitPrice * v.quantity * vatShare;
+        const net = preTax - tax;
+        $('price').textContent = format(unitPrice);
+        $('priceRMB').textContent = `≈ ${format(unitPrice * v.eurCny, 'CNY')} RMB`;
+        $('orderTotal').textContent = `订单收款 ${format(revenue)} / ${format(revenue * v.eurCny, 'CNY')}（含买家运费）`;
+        function result(id, value, deduction = false) {
+          const el = $(id); el.textContent = (deduction ? '−' : '') + format(value);
+          const secondary = document.createElement('small');
+          secondary.textContent = (deduction ? '−' : '') + format(value * v.eurCny, 'CNY') + ' RMB';
+          el.append(secondary);
+        }
+        result('revenue', revenue); result('percentFees', platformFees, true); result('regulatoryFees', regulatoryFees, true); result('fxFees', fxFees, true);
+        result('fixedFees', fixed, true); result('productCost', productCost, true);
+        result('extraTaxes', extraTaxes, true); result('courierTax', courierTax, true); result('otherCosts', otherCost, true);
+        $('vatLabel').textContent = `销售 VAT（从含税价拆分，税率 ${v.vatRate}%）`;
+        result('preTax', preTax); result('salesVAT', tax, true); result('netProfit', net);
+        $('badge').textContent = net + 1e-7 >= v.target ? '目标已达到' : '目标暂不可达';
+        $('badge').classList.toggle('loss', net + 1e-7 < v.target);
+        updatePlan(v, net);
+      }
+      ids.forEach(id => $(id).addEventListener('input', update));
+      document.querySelectorAll('[data-target]').forEach(button => button.addEventListener('click', () => { $('target').value = button.dataset.target; update(); }));
+      // 不隐藏费用项；按平台分别保留自定义费率，切换时恢复对应设置。
+      const platformFeeIds = ['transactionRate','paymentRate','paymentFixed','listingUSD','regulatoryRate','fxRate'];
+      const platformFeeDefaults = {
+        etsy: {transactionRate: 6.5, paymentRate: 4, paymentFixed: 0.30, listingUSD: 0.20, regulatoryRate: 0.88, fxRate: 2.5},
+        aliexpress: {transactionRate: 8, paymentRate: 0, paymentFixed: 0, listingUSD: 0, regulatoryRate: 0, fxRate: 0},
+        custom: {transactionRate: 0, paymentRate: 0, paymentFixed: 0, listingUSD: 0, regulatoryRate: 0, fxRate: 0}
+      };
+      let platformFeeStore = {};
+      try { platformFeeStore = JSON.parse(localStorage.getItem('shop-platform-fees-v1') || '{}') || {}; } catch {}
+      let activePlatform = $('platform').value;
+      // 已保存的旧版参数优先保留，避免升级后覆盖用户当前输入。
+      if (!platformFeeStore[activePlatform]) {
+        platformFeeStore[activePlatform] = Object.fromEntries(platformFeeIds.map(id => [id, Number($(id).value)]));
+      }
+      function savePlatformFees() {
+        platformFeeStore[activePlatform] = Object.fromEntries(platformFeeIds.map(id => [id, Number($(id).value)]));
+        try { localStorage.setItem('shop-platform-fees-v1', JSON.stringify(platformFeeStore)); } catch {}
+      }
+      platformFeeIds.forEach(id => $(id).addEventListener('input', savePlatformFees));
+      $('platform').addEventListener('change', () => {
+        savePlatformFees();
+        activePlatform = $('platform').value;
+        const rates = platformFeeStore[activePlatform] || platformFeeDefaults[activePlatform];
+        platformFeeIds.forEach(id => { $(id).value = rates[id] ?? 0; });
+        savePlatformFees();
+        update();
+      });
+      $('market').addEventListener('change', () => {
+        const eu = $('market').value !== 'us';
+        $('vatRate').value = eu ? 21 : 0;
+        $('customs').value = eu ? 3 : 0; $('clearance').value = eu ? 2 : 0;
+        update();
+      });
+      $('reset').addEventListener('click', () => { ids.forEach(id => { $(id).value = defaults[id]; }); activePlatform = 'etsy'; platformFeeStore = {}; savePlatformFees(); update(); });
+      // Match label heights within each grid row, including wrapped descriptions.
+      function alignFieldLabels() {
+        document.querySelectorAll('.fields').forEach(group => {
+          const fields = Array.from(group.children).filter(field => field.classList.contains('field'));
+          const labels = fields.map(field => field.querySelector('label'));
+          labels.forEach(label => { if (label) label.style.minHeight = ''; });
+          const rows = new Map();
+          fields.forEach((field, i) => {
+            const label = labels[i];
+            if (!label) return;
+            const top = field.offsetTop;
+            if (!rows.has(top)) rows.set(top, []);
+            rows.get(top).push(label);
+          });
+          const sizes = Array.from(rows.values()).map(row => [row, Math.max(...row.map(label => label.getBoundingClientRect().height))]);
+          sizes.forEach(([row, height]) => row.forEach(label => { label.style.minHeight = `${height}px`; }));
+        });
+      }
+      let alignmentFrame;
+      function scheduleFieldAlignment() {
+        cancelAnimationFrame(alignmentFrame);
+        alignmentFrame = requestAnimationFrame(alignFieldLabels);
+      }
+      window.addEventListener('resize', scheduleFieldAlignment);
+      window.addEventListener('load', scheduleFieldAlignment);
+      document.querySelectorAll('details').forEach(details => details.addEventListener('toggle', scheduleFieldAlignment));
+      if (document.fonts) document.fonts.ready.then(scheduleFieldAlignment);
+      update();
+      alignFieldLabels();
+    })();
+  </script>
+</body>
+</html>
